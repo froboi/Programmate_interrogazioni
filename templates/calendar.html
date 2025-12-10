@@ -1,0 +1,524 @@
+{% extends "base.html" %}
+
+{% block title %}Calendario Interrogazioni{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <!-- Header con azioni -->
+        <div class="card shadow mb-4">
+            <div class="card-header bg-primary text-white">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <h3 class="mb-0">
+                            <i class="bi bi-calendar3"></i>
+                            Calendario Interrogazioni: <span id="materia-title"></span>
+                        </h3>
+                    </div>
+                    <div class="col-md-6 text-end">
+                        <div class="btn-group" role="group">
+                            <button class="btn btn-light" id="btn-shuffle">
+                                <i class="bi bi-shuffle"></i>
+                                Rimescola
+                            </button>
+                            <button class="btn btn-light" id="btn-save-mysql">
+                                <i class="bi bi-database"></i>
+                                Salva MySQL
+                            </button>
+                            <button class="btn btn-light" id="btn-save-tinydb">
+                                <i class="bi bi-save"></i>
+                                Salva TinyDB
+                            </button>
+                            <button class="btn btn-light dropdown-toggle" data-bs-toggle="dropdown">
+                                <i class="bi bi-download"></i>
+                                Esporta
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="#" id="export-csv">
+                                    <i class="bi bi-file-earmark-spreadsheet"></i> CSV
+                                </a></li>
+                                <li><a class="dropdown-item" href="#" id="export-json">
+                                    <i class="bi bi-file-earmark-code"></i> JSON
+                                </a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Quality Score -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card border-info">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="bi bi-star-fill text-warning"></i>
+                            Valutazione Qualità Calendario
+                        </h5>
+                        <div class="d-flex align-items-center mb-2">
+                            <div class="progress flex-grow-1 me-3" style="height: 30px;">
+                                <div class="progress-bar" 
+                                     id="quality-bar" 
+                                     role="progressbar" 
+                                     style="width: 0%"></div>
+                            </div>
+                            <span class="badge bg-primary fs-5" id="quality-score">0</span>
+                        </div>
+                        <p class="mb-0" id="quality-text"></p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card border-success">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="bi bi-robot text-success"></i>
+                            Consigli AI
+                        </h5>
+                        <div id="ai-advice-container">
+                            <button class="btn btn-outline-success btn-sm" id="btn-get-advice">
+                                <i class="bi bi-lightbulb"></i>
+                                Ottieni Consigli
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Calendario Table -->
+        <div class="card shadow">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover" id="calendar-table">
+                        <thead class="table-dark">
+                            <tr>
+                                <th width="10%">Lezione</th>
+                                <th width="70%">Studenti Interrogati</th>
+                                <th width="20%">Azioni</th>
+                            </tr>
+                        </thead>
+                        <tbody id="calendar-body">
+                            <!-- Popolato dinamicamente -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics -->
+        <div class="row mt-4">
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h2 class="text-primary" id="stat-lessons">0</h2>
+                        <p class="mb-0">Lezioni</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h2 class="text-success" id="stat-total">0</h2>
+                        <p class="mb-0">Interrogazioni Totali</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h2 class="text-info" id="stat-avg">0</h2>
+                        <p class="mb-0">Media per Lezione</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h2 class="text-warning" id="stat-unique">0</h2>
+                        <p class="mb-0">Studenti Unici</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Modifica Lezione -->
+<div class="modal fade" id="modalModifyLesson" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-pencil"></i>
+                    Modifica Lezione <span id="modal-lesson-num"></span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Numero di Studenti</label>
+                    <input type="number" class="form-control" id="modal-new-count" min="0" max="20">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button type="button" class="btn btn-primary" id="btn-save-lesson-modify">Salva</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Cambia Studente -->
+<div class="modal fade" id="modalChangeStudent" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title">
+                    <i class="bi bi-arrow-left-right"></i>
+                    Cambia Studente
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Studente corrente: <strong id="modal-current-student"></strong></p>
+                <div class="mb-3">
+                    <label class="form-label">Nuovo Numero Registro</label>
+                    <input type="number" class="form-control" id="modal-new-registro" min="1">
+                </div>
+                <input type="hidden" id="modal-old-student-id">
+                <input type="hidden" id="modal-change-lesson-num">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button type="button" class="btn btn-warning" id="btn-save-student-change">Cambia</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    let currentMateria = '';
+    let currentCalendar = {};
+    
+    // Carica configurazione
+    const config = JSON.parse(sessionStorage.getItem('calendar_config'));
+    if (config) {
+        currentMateria = config.materia;
+        $('#materia-title').text(currentMateria);
+    }
+    
+    // Carica calendario
+    loadCalendar();
+    
+    // Carica quality score
+    loadQualityScore();
+    
+    // Rimescola calendario
+    $('#btn-shuffle').on('click', function() {
+        if (confirm('Vuoi rimescolare le interrogazioni? Gli studenti verranno riassegnati casualmente.')) {
+            const btn = $(this);
+            btn.prop('disabled', true);
+            
+            $.ajax({
+                url: '/api/shuffle-assignments',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ materia: currentMateria }),
+                success: function(response) {
+                    if (response.success) {
+                        showAlert('Calendario rimescolato con successo!', 'success');
+                        currentCalendar = response.calendario;
+                        renderCalendar();
+                        updateQualityScore(response.quality_score);
+                    } else {
+                        showAlert('Errore: ' + response.error, 'danger');
+                    }
+                    btn.prop('disabled', false);
+                },
+                error: function() {
+                    showAlert('Errore nella comunicazione con il server', 'danger');
+                    btn.prop('disabled', false);
+                }
+            });
+        }
+    });
+    
+    // Salva MySQL
+    $('#btn-save-mysql').on('click', function() {
+        $.post('/api/save-to-db', function(response) {
+            if (response.success) {
+                showAlert('Salvato su MySQL!', 'success');
+            } else {
+                showAlert('Errore salvataggio: ' + response.error, 'danger');
+            }
+        });
+    });
+    
+    // Salva TinyDB
+    $('#btn-save-tinydb').on('click', function() {
+        $.post('/api/save-to-tinydb', function(response) {
+            if (response.success) {
+                showAlert('Salvato su TinyDB!', 'success');
+            } else {
+                showAlert('Errore salvataggio: ' + response.error, 'danger');
+            }
+        });
+    });
+    
+    // Esporta CSV
+    $('#export-csv').on('click', function(e) {
+        e.preventDefault();
+        exportData('csv');
+    });
+    
+    // Esporta JSON
+    $('#export-json').on('click', function(e) {
+        e.preventDefault();
+        exportData('json');
+    });
+    
+    // Get AI advice
+    $('#btn-get-advice').on('click', function() {
+        $.ajax({
+            url: '/api/ai-advice',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ 
+                materia: currentMateria,
+                advice_type: 'general'
+            }),
+            success: function(response) {
+                if (response.success) {
+                    displayAIAdvice(response.advice);
+                }
+            }
+        });
+    });
+    
+    // Salva modifica lezione
+    $('#btn-save-lesson-modify').on('click', function() {
+        const lessonNum = parseInt($('#modal-lesson-num').text());
+        const newCount = parseInt($('#modal-new-count').val());
+        
+        $.ajax({
+            url: '/api/modify-day',
+            type: 'PUT',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                materia: currentMateria,
+                lezione_num: lessonNum,
+                new_count: newCount
+            }),
+            success: function(response) {
+                if (response.success) {
+                    showAlert('Lezione modificata!', 'success');
+                    $('#modalModifyLesson').modal('hide');
+                    loadCalendar();
+                }
+            }
+        });
+    });
+    
+    // Salva cambio studente
+    $('#btn-save-student-change').on('click', function() {
+        const lessonNum = parseInt($('#modal-change-lesson-num').val());
+        const oldStudentId = parseInt($('#modal-old-student-id').val());
+        const newRegistro = parseInt($('#modal-new-registro').val());
+        
+        $.ajax({
+            url: '/api/change-student-in-day',
+            type: 'PUT',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                materia: currentMateria,
+                lezione_num: lessonNum,
+                old_student_id: oldStudentId,
+                new_registro_num: newRegistro
+            }),
+            success: function(response) {
+                if (response.success) {
+                    showAlert('Studente sostituito!', 'success');
+                    $('#modalChangeStudent').modal('hide');
+                    loadCalendar();
+                } else {
+                    showAlert('Errore: ' + response.error, 'danger');
+                }
+            }
+        });
+    });
+    
+    // Functions
+    function loadCalendar() {
+        $.get(`/api/get-calendar/${currentMateria}`, function(response) {
+            if (response.success) {
+                currentCalendar = response.calendario;
+                renderCalendar();
+                updateStatistics();
+            }
+        });
+    }
+    
+    function renderCalendar() {
+        const tbody = $('#calendar-body');
+        tbody.empty();
+        
+        Object.keys(currentCalendar).sort((a, b) => a - b).forEach(lessonNum => {
+            const students = currentCalendar[lessonNum];
+            
+            let studentsHtml = '<div class="d-flex flex-wrap gap-2">';
+            students.forEach(student => {
+                const studentData = student.student || student;
+                studentsHtml += `
+                    <span class="badge bg-primary p-2" style="cursor: pointer;" 
+                          onclick="openChangeStudentModal(${lessonNum}, ${studentData.id}, '${studentData.nome} ${studentData.cognome}', ${studentData.registro_num})">
+                        ${studentData.registro_num} - ${studentData.nome} ${studentData.cognome}
+                        <i class="bi bi-pencil-square ms-1"></i>
+                    </span>
+                `;
+            });
+            studentsHtml += '</div>';
+            
+            const row = `
+                <tr>
+                    <td class="text-center align-middle">
+                        <strong class="fs-5">Lezione ${lessonNum}</strong>
+                    </td>
+                    <td>${studentsHtml}</td>
+                    <td class="text-center align-middle">
+                        <button class="btn btn-sm btn-outline-primary" onclick="openModifyLessonModal(${lessonNum}, ${students.length})">
+                            <i class="bi bi-gear"></i>
+                            Modifica
+                        </button>
+                    </td>
+                </tr>
+            `;
+            
+            tbody.append(row);
+        });
+    }
+    
+    function updateStatistics() {
+        const lessons = Object.keys(currentCalendar).length;
+        let total = 0;
+        const uniqueStudents = new Set();
+        
+        Object.values(currentCalendar).forEach(students => {
+            total += students.length;
+            students.forEach(s => {
+                const studentData = s.student || s;
+                uniqueStudents.add(studentData.id);
+            });
+        });
+        
+        const avg = lessons > 0 ? (total / lessons).toFixed(1) : 0;
+        
+        $('#stat-lessons').text(lessons);
+        $('#stat-total').text(total);
+        $('#stat-avg').text(avg);
+        $('#stat-unique').text(uniqueStudents.size);
+    }
+    
+    function loadQualityScore() {
+        const qualityScore = JSON.parse(sessionStorage.getItem('quality_score'));
+        if (qualityScore) {
+            updateQualityScore(qualityScore);
+        }
+    }
+    
+    function updateQualityScore(scoreData) {
+        const score = scoreData.score;
+        const quality = scoreData.quality;
+        
+        $('#quality-score').text(score);
+        $('#quality-bar').css('width', score + '%').text(score + '/100');
+        $('#quality-text').html(`<strong>${quality}</strong> - ${scoreData.good_points.join(', ')}`);
+        
+        // Colora progress bar
+        const bar = $('#quality-bar');
+        bar.removeClass('bg-success bg-warning bg-danger');
+        if (score >= 80) bar.addClass('bg-success');
+        else if (score >= 60) bar.addClass('bg-warning');
+        else bar.addClass('bg-danger');
+    }
+    
+    function displayAIAdvice(advice) {
+        let html = '<div class="list-group list-group-flush">';
+        
+        if (advice.advice) {
+            advice.advice.forEach(item => {
+                const icon = item.importance === 'alta' ? 'exclamation-circle' : 
+                            item.importance === 'media' ? 'info-circle' : 'lightbulb';
+                const color = item.importance === 'alta' ? 'danger' : 
+                             item.importance === 'media' ? 'warning' : 'info';
+                
+                html += `
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">
+                                <i class="bi bi-${icon} text-${color}"></i>
+                                ${item.category}
+                            </h6>
+                            <small class="text-${color}">${item.importance.toUpperCase()}</small>
+                        </div>
+                        <p class="mb-0 small">${item.tip}</p>
+                    </div>
+                `;
+            });
+        }
+        
+        html += '</div>';
+        $('#ai-advice-container').html(html);
+    }
+    
+    function exportData(format) {
+        $.ajax({
+            url: '/api/export',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                materia: currentMateria,
+                format: format
+            }),
+            xhrFields: {
+                responseType: 'blob'
+            },
+            success: function(blob, status, xhr) {
+                const filename = xhr.getResponseHeader('Content-Disposition')
+                    ?.split('filename=')[1] || `calendario.${format}`;
+                
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+                
+                showAlert(`File ${format.toUpperCase()} scaricato!`, 'success');
+            }
+        });
+    }
+    
+    // Global functions for modal triggers
+    window.openModifyLessonModal = function(lessonNum, currentCount) {
+        $('#modal-lesson-num').text(lessonNum);
+        $('#modal-new-count').val(currentCount);
+        $('#modalModifyLesson').modal('show');
+    };
+    
+    window.openChangeStudentModal = function(lessonNum, studentId, studentName, registro) {
+        $('#modal-current-student').text(studentName);
+        $('#modal-old-student-id').val(studentId);
+        $('#modal-change-lesson-num').val(lessonNum);
+        $('#modal-new-registro').val(registro);
+        $('#modalChangeStudent').modal('show');
+    };
+});
+</script>
+{% endblock %}

@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+
+{% block title %}Home - Configurazione Calendario{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h3 class="mb-0">
+                    <i class="bi bi-gear"></i>
+                    Configurazione Calendario Interrogazioni
+                </h3>
+            </div>
+            <div class="card-body">
+                <form id="config-form">
+                    <!-- Materia -->
+                    <div class="mb-4">
+                        <label for="materia" class="form-label fw-bold">
+                            <i class="bi bi-book"></i>
+                            Materia
+                        </label>
+                        <input type="text" 
+                               class="form-control form-control-lg" 
+                               id="materia" 
+                               name="materia" 
+                               placeholder="Es: Matematica, Storia, Inglese..." 
+                               required>
+                        <div class="form-text">Inserisci il nome della materia per cui creare il calendario</div>
+                    </div>
+
+                    <!-- Numero Lezioni -->
+                    <div class="mb-4">
+                        <label for="num_lezioni" class="form-label fw-bold">
+                            <i class="bi bi-calendar-week"></i>
+                            Numero di Lezioni Settimanali
+                        </label>
+                        <input type="number" 
+                               class="form-control form-control-lg" 
+                               id="num_lezioni" 
+                               name="num_lezioni" 
+                               min="1" 
+                               max="10" 
+                               value="3" 
+                               required>
+                        <div class="form-text">Quanti giorni a settimana hai lezione per questa materia?</div>
+                    </div>
+
+                    <!-- Distribuzione Container -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">
+                            <i class="bi bi-list-ol"></i>
+                            Distribuzione Alunni per Giorno
+                        </label>
+                        <div id="distribution-container" class="border rounded p-3 bg-light">
+                            <!-- Dinamicamente popolato con JS -->
+                        </div>
+                        <div class="form-text">Specifica quanti alunni interrogare in ogni giorno della settimana</div>
+                    </div>
+
+                    <!-- AI Suggestions -->
+                    <div class="alert alert-info" id="ai-suggestion" style="display: none;">
+                        <h6 class="alert-heading">
+                            <i class="bi bi-lightbulb"></i>
+                            Suggerimento AI
+                        </h6>
+                        <p class="mb-0" id="ai-suggestion-text"></p>
+                    </div>
+
+                    <!-- Buttons -->
+                    <div class="d-grid gap-2">
+                        <button type="button" class="btn btn-primary btn-lg" id="btn-next">
+                            Procedi al Caricamento Studenti
+                            <i class="bi bi-arrow-right"></i>
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="btn-get-suggestion">
+                            <i class="bi bi-robot"></i>
+                            Ottieni Suggerimento AI
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Info Card -->
+        <div class="card mt-4 border-info">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-info-circle text-info"></i>
+                    Come Funziona
+                </h5>
+                <ol class="mb-0">
+                    <li>Inserisci il nome della materia</li>
+                    <li>Specifica quanti giorni a settimana hai lezione</li>
+                    <li>Per ogni giorno, indica quanti studenti vuoi interrogare</li>
+                    <li>Carica la lista degli studenti (formato CSV o JSON)</li>
+                    <li>Il sistema genererà automaticamente tutte le lezioni necessarie per interrogare tutti gli studenti una volta</li>
+                    <li><strong>Esempio:</strong> 23 studenti, 2 giorni/settimana, 3 studenti/giorno = 4 settimane (8 lezioni totali)</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Genera i campi di distribuzione quando cambia il numero di lezioni
+    function generateDistributionFields() {
+        const numLezioni = parseInt($('#num_lezioni').val());
+        const container = $('#distribution-container');
+        container.empty();
+        
+        if (numLezioni > 0 && numLezioni <= 10) {
+            for (let i = 1; i <= numLezioni; i++) {
+                const field = `
+                    <div class="mb-3">
+                        <label for="lezione_${i}" class="form-label">
+                            Lezione ${i}
+                        </label>
+                        <input type="number" 
+                               class="form-control distribution-input" 
+                               id="lezione_${i}" 
+                               name="lezione_${i}" 
+                               min="1" 
+                               max="20" 
+                               value="2" 
+                               required>
+                        <small class="form-text text-muted">Numero di studenti da interrogare</small>
+                    </div>
+                `;
+                container.append(field);
+            }
+        }
+    }
+    
+    // Inizializza i campi
+    generateDistributionFields();
+    
+    // Rigenera i campi quando cambia il numero di lezioni
+    $('#num_lezioni').on('change', generateDistributionFields);
+    
+    // Salva configurazione e vai alla pagina upload
+    $('#btn-next').on('click', function() {
+        const materia = $('#materia').val().trim();
+        const numLezioni = parseInt($('#num_lezioni').val());
+        
+        if (!materia) {
+            showAlert('Inserisci il nome della materia', 'warning');
+            return;
+        }
+        
+        // Raccoglie la distribuzione
+        const distribuzione = [];
+        for (let i = 1; i <= numLezioni; i++) {
+            const val = parseInt($(`#lezione_${i}`).val());
+            if (val > 0) {
+                distribuzione.push(val);
+            }
+        }
+        
+        // Salva in sessionStorage
+        const config = {
+            materia: materia,
+            num_lezioni: numLezioni,
+            distribuzione: distribuzione
+        };
+        
+        sessionStorage.setItem('calendar_config', JSON.stringify(config));
+        
+        // Reindirizza
+        window.location.href = '/upload';
+    });
+    
+    // Ottieni suggerimento AI
+    $('#btn-get-suggestion').on('click', function() {
+        const numLezioni = parseInt($('#num_lezioni').val());
+        const totalStudents = 25; // Placeholder, poi useremo il vero numero
+        
+        // Calcola distribuzione ottimale
+        const baseCount = Math.floor(totalStudents / numLezioni);
+        const remainder = totalStudents % numLezioni;
+        
+        let suggestion = `Con ${totalStudents} studenti e ${numLezioni} lezioni, la distribuzione ottimale è: `;
+        suggestion += `${baseCount} o ${baseCount + 1} studenti per lezione. `;
+        suggestion += `Questo mantiene il carico bilanciato e garantisce equità.`;
+        
+        $('#ai-suggestion-text').text(suggestion);
+        $('#ai-suggestion').slideDown();
+    });
+});
+</script>
+{% endblock %}

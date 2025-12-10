@@ -1,0 +1,127 @@
+[
+  {
+    "registro_num": 1,
+    "nome": "Mario",
+    "cognome": "Rossi"
+  },
+  {
+    "registro_num": 2,
+    "nome": "Luca",
+    "cognome": "Bianchi"
+  },
+  {
+    "registro_num": 3,
+    "nome": "Anna",
+    "cognome": "Verdi"
+  },
+  {
+    "registro_num": 4,
+    "nome": "Giovanni",
+    "cognome": "Neri"
+  },
+  {
+    "registro_num": 5,
+    "nome": "Sofia",
+    "cognome": "Gialli"
+  },
+  {
+    "registro_num": 6,
+    "nome": "Marco",
+    "cognome": "Blu"
+  },
+  {
+    "registro_num": 7,
+    "nome": "Laura",
+    "cognome": "Viola"
+  },
+  {
+    "registro_num": 8,
+    "nome": "Alessandro",
+    "cognome": "Arancione"
+  },
+  {
+    "registro_num": 9,
+    "nome": "Francesca",
+    "cognome": "Rosa"
+  },
+  {
+    "registro_num": 10,
+    "nome": "Davide",
+    "cognome": "Marrone"
+  },
+  {
+    "registro_num": 11,
+    "nome": "Elena",
+    "cognome": "Azzurri"
+  },
+  {
+    "registro_num": 12,
+    "nome": "Matteo",
+    "cognome": "Grigi"
+  },
+  {
+    "registro_num": 13,
+    "nome": "Chiara",
+    "cognome": "Argentini"
+  },
+  {
+    "registro_num": 14,
+    "nome": "Simone",
+    "cognome": "Dorati"
+  },
+  {
+    "registro_num": 15,
+    "nome": "Valentina",
+    "cognome": "Bronzi"
+  },
+  {
+    "registro_num": 16,
+    "nome": "Federico",
+    "cognome": "Platini"
+  },
+  {
+    "registro_num": 17,
+    "nome": "Giulia",
+    "cognome": "Rame"
+  },
+  {
+    "registro_num": 18,
+    "nome": "Andrea",
+    "cognome": "Ferro"
+  },
+  {
+    "registro_num": 19,
+    "nome": "Sara",
+    "cognome": "Oro"
+  },
+  {
+    "registro_num": 20,
+    "nome": "Riccardo",
+    "cognome": "Argento"
+  },
+  {
+    "registro_num": 21,
+    "nome": "Martina",
+    "cognome": "Rubino"
+  },
+  {
+    "registro_num": 22,
+    "nome": "Filippo",
+    "cognome": "Smeraldo"
+  },
+  {
+    "registro_num": 23,
+    "nome": "Beatrice",
+    "cognome": "Zaffiro"
+  },
+  {
+    "registro_num": 24,
+    "nome": "Lorenzo",
+    "cognome": "Topazio"
+  },
+  {
+    "registro_num": 25,
+    "nome": "Alessia",
+    "cognome": "Ambra"
+  }
+]
