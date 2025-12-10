@@ -1,16 +1,9 @@
 // Store programs in localStorage
 let programmi = [];
 
-// Utility function to escape HTML to prevent XSS
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
 // Generate unique ID
 function generateId() {
-    return Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+    return Date.now() + '-' + Math.random().toString(36).substring(2, 11);
 }
 
 // Load programs from localStorage on page load
@@ -61,12 +54,42 @@ function displayResult(programma) {
     const resultDiv = document.getElementById('result');
     const resultContent = document.getElementById('resultContent');
     
-    resultContent.innerHTML = `
-        <div class="result-item"><strong>Materia:</strong> ${escapeHtml(programma.materia)}</div>
-        <div class="result-item"><strong>Frequenza settimanale:</strong> ${programma.frequenza} ${programma.frequenza === 1 ? 'volta' : 'volte'}</div>
-        <div class="result-item"><strong>Alunni per lezione:</strong> ${programma.alunni}</div>
-        <div class="result-item"><strong>Data creazione:</strong> ${escapeHtml(programma.dataCreazione)}</div>
-    `;
+    // Clear previous content
+    resultContent.innerHTML = '';
+    
+    // Create result items using DOM manipulation
+    const materiaDiv = document.createElement('div');
+    materiaDiv.className = 'result-item';
+    const materiaStrong = document.createElement('strong');
+    materiaStrong.textContent = 'Materia: ';
+    materiaDiv.appendChild(materiaStrong);
+    materiaDiv.appendChild(document.createTextNode(programma.materia));
+    
+    const freqDiv = document.createElement('div');
+    freqDiv.className = 'result-item';
+    const freqStrong = document.createElement('strong');
+    freqStrong.textContent = 'Frequenza settimanale: ';
+    freqDiv.appendChild(freqStrong);
+    freqDiv.appendChild(document.createTextNode(`${programma.frequenza} ${programma.frequenza === 1 ? 'volta' : 'volte'}`));
+    
+    const alunniDiv = document.createElement('div');
+    alunniDiv.className = 'result-item';
+    const alunniStrong = document.createElement('strong');
+    alunniStrong.textContent = 'Alunni per lezione: ';
+    alunniDiv.appendChild(alunniStrong);
+    alunniDiv.appendChild(document.createTextNode(programma.alunni));
+    
+    const dataDiv = document.createElement('div');
+    dataDiv.className = 'result-item';
+    const dataStrong = document.createElement('strong');
+    dataStrong.textContent = 'Data creazione: ';
+    dataDiv.appendChild(dataStrong);
+    dataDiv.appendChild(document.createTextNode(programma.dataCreazione));
+    
+    resultContent.appendChild(materiaDiv);
+    resultContent.appendChild(freqDiv);
+    resultContent.appendChild(alunniDiv);
+    resultContent.appendChild(dataDiv);
     
     resultDiv.classList.remove('hidden');
     
