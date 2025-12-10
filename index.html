@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Programmate Interrogazioni</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Programmate Interrogazioni</h1>
+        <p class="subtitle">Gestisci le interrogazioni per le tue lezioni</p>
+        
+        <form id="interrogazioniForm">
+            <!-- Step 1: Materia -->
+            <div class="form-group">
+                <label for="materia">Per che materia?</label>
+                <input type="text" id="materia" name="materia" required placeholder="Es. Matematica, Italiano, Storia...">
+            </div>
+
+            <!-- Step 2: Frequenza settimanale -->
+            <div class="form-group">
+                <label for="frequenza">Quante volte alla settimana c'è questa lezione?</label>
+                <input type="number" id="frequenza" name="frequenza" min="1" max="7" required placeholder="Es. 3">
+            </div>
+
+            <!-- Step 3: Numero alunni per lezione -->
+            <div class="form-group">
+                <label for="alunni">Quanti alunni si vuole interrogare a lezione?</label>
+                <input type="number" id="alunni" name="alunni" min="1" required placeholder="Es. 2">
+            </div>
+
+            <button type="submit" class="submit-btn">Salva Programma</button>
+        </form>
+
+        <div id="result" class="result hidden">
+            <h2>Programma Salvato</h2>
+            <div id="resultContent"></div>
+            <button id="resetBtn" class="reset-btn">Crea Nuovo Programma</button>
+        </div>
+
+        <div id="programmiSalvati" class="programmi-salvati hidden">
+            <h2>Programmi Salvati</h2>
+            <div id="programmiList"></div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
