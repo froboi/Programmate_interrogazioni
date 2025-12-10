@@ -1,6 +1,18 @@
 // Store programs in localStorage
 let programmi = [];
 
+// Utility function to escape HTML to prevent XSS
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Generate unique ID
+function generateId() {
+    return Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+}
+
 // Load programs from localStorage on page load
 window.addEventListener('DOMContentLoaded', () => {
     loadProgrammi();
@@ -17,7 +29,7 @@ document.getElementById('interrogazioniForm').addEventListener('submit', (e) => 
     
     // Create program object
     const programma = {
-        id: Date.now(),
+        id: generateId(),
         materia: materia,
         frequenza: parseInt(frequenza),
         alunni: parseInt(alunni),
@@ -50,10 +62,10 @@ function displayResult(programma) {
     const resultContent = document.getElementById('resultContent');
     
     resultContent.innerHTML = `
-        <div class="result-item"><strong>Materia:</strong> ${programma.materia}</div>
+        <div class="result-item"><strong>Materia:</strong> ${escapeHtml(programma.materia)}</div>
         <div class="result-item"><strong>Frequenza settimanale:</strong> ${programma.frequenza} ${programma.frequenza === 1 ? 'volta' : 'volte'}</div>
         <div class="result-item"><strong>Alunni per lezione:</strong> ${programma.alunni}</div>
-        <div class="result-item"><strong>Data creazione:</strong> ${programma.dataCreazione}</div>
+        <div class="result-item"><strong>Data creazione:</strong> ${escapeHtml(programma.dataCreazione)}</div>
     `;
     
     resultDiv.classList.remove('hidden');
@@ -74,15 +86,48 @@ function displayProgrammi() {
     
     programmiDiv.classList.remove('hidden');
     
-    programmiList.innerHTML = programmi.map(p => `
-        <div class="programma-item">
-            <h3>${p.materia}</h3>
-            <p><strong>Frequenza:</strong> ${p.frequenza} ${p.frequenza === 1 ? 'volta' : 'volte'} alla settimana</p>
-            <p><strong>Alunni per lezione:</strong> ${p.alunni}</p>
-            <p><strong>Creato il:</strong> ${p.dataCreazione}</p>
-            <button class="delete-btn" onclick="deleteProgramma(${p.id})">Elimina</button>
-        </div>
-    `).join('');
+    // Clear previous content
+    programmiList.innerHTML = '';
+    
+    // Create program items using DOM manipulation for security
+    programmi.forEach(p => {
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'programma-item';
+        
+        const h3 = document.createElement('h3');
+        h3.textContent = p.materia;
+        
+        const freqP = document.createElement('p');
+        const freqStrong = document.createElement('strong');
+        freqStrong.textContent = 'Frequenza: ';
+        freqP.appendChild(freqStrong);
+        freqP.appendChild(document.createTextNode(`${p.frequenza} ${p.frequenza === 1 ? 'volta' : 'volte'} alla settimana`));
+        
+        const alunniP = document.createElement('p');
+        const alunniStrong = document.createElement('strong');
+        alunniStrong.textContent = 'Alunni per lezione: ';
+        alunniP.appendChild(alunniStrong);
+        alunniP.appendChild(document.createTextNode(p.alunni));
+        
+        const dataP = document.createElement('p');
+        const dataStrong = document.createElement('strong');
+        dataStrong.textContent = 'Creato il: ';
+        dataP.appendChild(dataStrong);
+        dataP.appendChild(document.createTextNode(p.dataCreazione));
+        
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'delete-btn';
+        deleteBtn.textContent = 'Elimina';
+        deleteBtn.addEventListener('click', () => deleteProgramma(p.id));
+        
+        itemDiv.appendChild(h3);
+        itemDiv.appendChild(freqP);
+        itemDiv.appendChild(alunniP);
+        itemDiv.appendChild(dataP);
+        itemDiv.appendChild(deleteBtn);
+        
+        programmiList.appendChild(itemDiv);
+    });
 }
 
 // Delete a program
@@ -104,8 +149,15 @@ function saveProgrammi() {
 
 // Load programs from localStorage
 function loadProgrammi() {
-    const saved = localStorage.getItem('programmi');
-    if (saved) {
-        programmi = JSON.parse(saved);
+    try {
+        const saved = localStorage.getItem('programmi');
+        if (saved) {
+            programmi = JSON.parse(saved);
+        }
+    } catch (error) {
+        console.error('Error loading programs from localStorage:', error);
+        programmi = [];
+        // Clear corrupted data
+        localStorage.removeItem('programmi');
     }
 }
