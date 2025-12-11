@@ -2,6 +2,10 @@
 Applicazione Flask principale per gestione interrogazioni programmate
 Fornisce API REST per gestione studenti e calendario interrogazioni
 """
+# Usa PyMySQL al posto di mysqlclient su Windows
+import pymysql
+pymysql.install_as_MySQLdb()
+
 from flask import Flask, render_template, request, jsonify, send_file
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
@@ -11,6 +15,11 @@ import csv
 import random
 from datetime import datetime
 from io import StringIO
+from reportlab.lib.pagesizes import A4, letter
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+from reportlab.lib.units import cm
 
 # Import moduli personalizzati
 from app.models import db, Student, Interrogation, CalendarConfiguration
@@ -49,6 +58,141 @@ def allowed_file(filename):
     """
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
+
+
+def generate_pdf_calendar(filepath, materia, interrogations):
+    """
+    Genera un file PDF con il calendario delle interrogazioni
+    
+    Args:
+        filepath (str): Percorso del file PDF da creare
+        materia (str): Nome della materia
+        interrogations (list): Lista di oggetti Interrogation
+    """
+    # Crea documento PDF
+    doc = SimpleDocTemplate(
+        filepath,
+        pagesize=A4,
+        rightMargin=2*cm,
+        leftMargin=2*cm,
+        topMargin=2*cm,
+        bottomMargin=2*cm
+    )
+    
+    # Elementi del documento
+    elements = []
+    styles = getSampleStyleSheet()
+    
+    # Titolo
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=24,
+        textColor=colors.HexColor('#667eea'),
+        spaceAfter=30,
+        alignment=1  # Center
+    )
+    title = Paragraph(f"Calendario Interrogazioni<br/>{materia}", title_style)
+    elements.append(title)
+    
+    # Data di generazione
+    date_style = ParagraphStyle(
+        'DateStyle',
+        parent=styles['Normal'],
+        fontSize=10,
+        textColor=colors.grey,
+        alignment=1
+    )
+    date_text = Paragraph(f"Generato il {datetime.now().strftime('%d/%m/%Y alle %H:%M')}", date_style)
+    elements.append(date_text)
+    elements.append(Spacer(1, 1*cm))
+    
+    # Raggruppa interrogazioni per lezione
+    lezioni = {}
+    for interr in interrogations:
+        if interr.lezione_num not in lezioni:
+            lezioni[interr.lezione_num] = []
+        lezioni[interr.lezione_num].append(interr)
+    
+    # Crea tabelle per ogni lezione
+    for lezione_num in sorted(lezioni.keys()):
+        # Titolo lezione
+        lezione_style = ParagraphStyle(
+            'LessonTitle',
+            parent=styles['Heading2'],
+            fontSize=14,
+            textColor=colors.HexColor('#764ba2'),
+            spaceAfter=10
+        )
+        lezione_title = Paragraph(f"Lezione {lezione_num}", lezione_style)
+        elements.append(lezione_title)
+        
+        # Dati tabella
+        table_data = [['Ordine', 'Registro', 'Nome', 'Cognome', 'Data Lezione']]
+        
+        for interr in sorted(lezioni[lezione_num], key=lambda x: x.ordine):
+            table_data.append([
+                str(interr.ordine),
+                str(interr.student.registro_num),
+                interr.student.nome,
+                interr.student.cognome,
+                interr.data_lezione.strftime('%d/%m/%Y') if interr.data_lezione else 'N/A'
+            ])
+        
+        # Crea tabella
+        table = Table(table_data, colWidths=[2*cm, 2.5*cm, 4*cm, 4*cm, 3*cm])
+        table.setStyle(TableStyle([
+            # Header
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 11),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            
+            # Body
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+            ('ALIGN', (0, 1), (1, -1), 'CENTER'),  # Centra ordine e registro
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 10),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f5f5f5')]),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 8),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        
+        elements.append(table)
+        elements.append(Spacer(1, 0.5*cm))
+    
+    # Statistiche finali
+    elements.append(Spacer(1, 1*cm))
+    stats_style = ParagraphStyle(
+        'StatsStyle',
+        parent=styles['Normal'],
+        fontSize=10,
+        textColor=colors.HexColor('#333333')
+    )
+    
+    total_interr = len(interrogations)
+    total_lezioni = len(lezioni)
+    studenti_unici = len(set(i.student_id for i in interrogations))
+    
+    stats_text = f"""
+    <b>Statistiche:</b><br/>
+    • Totale interrogazioni: {total_interr}<br/>
+    • Numero lezioni: {total_lezioni}<br/>
+    • Studenti coinvolti: {studenti_unici}
+    """
+    
+    stats = Paragraph(stats_text, stats_style)
+    elements.append(stats)
+    
+    # Genera il PDF
+    doc.build(elements)
 
 
 def parse_csv(file_path):
@@ -763,11 +907,11 @@ def save_to_tinydb():
 @app.route('/api/export', methods=['POST'])
 def export_data():
     """
-    Esporta il calendario in CSV o JSON
+    Esporta il calendario in CSV, JSON o PDF
     
     Request Body:
         materia (str): Nome materia
-        format (str): 'csv' o 'json'
+        format (str): 'csv', 'json' o 'pdf'
         
     Returns:
         File: File scaricabile
@@ -803,6 +947,16 @@ def export_data():
                         interr.student.cognome,
                         interr.data_lezione.isoformat() if interr.data_lezione else ''
                     ])
+            
+            return send_file(filepath, as_attachment=True, download_name=filename)
+        
+        elif format_type == 'pdf':
+            # Esporta PDF
+            filename = f'calendario_{materia}_{timestamp}.pdf'
+            filepath = os.path.join(app.config['EXPORT_FOLDER'], filename)
+            
+            # Crea il PDF
+            generate_pdf_calendar(filepath, materia, interrogations)
             
             return send_file(filepath, as_attachment=True, download_name=filename)
         
@@ -889,6 +1043,113 @@ def get_ai_advice():
         
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ==================== VISUALIZZAZIONE INTERROGAZIONI ====================
+
+@app.route('/api/interrogations', methods=['GET'])
+def get_interrogations():
+    """
+    Endpoint per visualizzare tutte le interrogazioni salvate nel database
+    
+    Query Parameters:
+        materia (str, optional): Filtra per materia specifica
+        student_id (int, optional): Filtra per studente specifico
+        limit (int, optional): Limita il numero di risultati
+    
+    Returns:
+        JSON: {
+            "success": bool,
+            "count": int,
+            "interrogations": [...]
+        }
+    """
+    try:
+        # Ottieni parametri di filtro
+        materia = request.args.get('materia')
+        student_id = request.args.get('student_id', type=int)
+        limit = request.args.get('limit', type=int)
+        
+        # Query base
+        query = Interrogation.query
+        
+        # Applica filtri se presenti
+        if materia:
+            query = query.filter_by(materia=materia)
+        if student_id:
+            query = query.filter_by(student_id=student_id)
+        
+        # Ordina per materia, lezione e ordine
+        query = query.order_by(
+            Interrogation.materia,
+            Interrogation.lezione_num,
+            Interrogation.ordine
+        )
+        
+        # Applica limite se specificato
+        if limit:
+            query = query.limit(limit)
+        
+        # Esegui query
+        interrogations = query.all()
+        
+        # Converti in dizionari
+        result = [interr.to_dict() for interr in interrogations]
+        
+        return jsonify({
+            'success': True,
+            'count': len(result),
+            'interrogations': result
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Errore durante recupero interrogazioni: {str(e)}'
+        }), 500
+
+
+@app.route('/api/interrogations/<int:interrogation_id>', methods=['GET'])
+def get_interrogation_by_id(interrogation_id):
+    """
+    Endpoint per visualizzare una singola interrogazione per ID
+    
+    Args:
+        interrogation_id (int): ID dell'interrogazione
+    
+    Returns:
+        JSON: {
+            "success": bool,
+            "interrogation": {...}
+        }
+    """
+    try:
+        interrogation = Interrogation.query.get(interrogation_id)
+        
+        if not interrogation:
+            return jsonify({
+                'success': False,
+                'error': 'Interrogazione non trovata'
+            }), 404
+        
+        return jsonify({
+            'success': True,
+            'interrogation': interrogation.to_dict()
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Errore durante recupero interrogazione: {str(e)}'
+        }), 500
+
+
+@app.route('/interrogations')
+def view_interrogations():
+    """
+    Pagina HTML per visualizzare le interrogazioni salvate
+    """
+    return render_template('interrogations.html')
 
 
 # ==================== ERRORI ====================

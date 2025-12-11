@@ -40,6 +40,9 @@
                                 <li><a class="dropdown-item" href="#" id="export-json">
                                     <i class="bi bi-file-earmark-code"></i> JSON
                                 </a></li>
+                                <li><a class="dropdown-item" href="#" id="export-pdf">
+                                    <i class="bi bi-file-earmark-pdf"></i> PDF
+                                </a></li>
                             </ul>
                         </div>
                     </div>
@@ -280,6 +283,12 @@ $(document).ready(function() {
     $('#export-json').on('click', function(e) {
         e.preventDefault();
         exportData('json');
+    });
+    
+    // Esporta PDF
+    $('#export-pdf').on('click', function(e) {
+        e.preventDefault();
+        exportData('pdf');
     });
     
     // Get AI advice
