@@ -844,6 +844,137 @@ def change_student_in_day():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/set-lesson-date', methods=['PUT'])
+def set_lesson_date():
+    """
+    Assegna una data effettiva a una lezione
+    
+    Request Body:
+        materia (str): Nome materia
+        lezione_num (int): Numero lezione
+        data_lezione (str): Data in formato YYYY-MM-DD
+        
+    Returns:
+        JSON: Risultato aggiornamento
+    """
+    try:
+        data = request.get_json()
+        
+        if not all(k in data for k in ['materia', 'lezione_num', 'data_lezione']):
+            return jsonify({'success': False, 'error': 'Dati mancanti'}), 400
+        
+        materia = data['materia']
+        lezione_num = data['lezione_num']
+        data_lezione = data['data_lezione']
+        
+        # Valida formato data
+        try:
+            from datetime import datetime
+            datetime.strptime(data_lezione, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({'success': False, 'error': 'Formato data non valido. Usa YYYY-MM-DD'}), 400
+        
+        # Aggiorna tutte le interrogazioni della lezione
+        interrogations = Interrogation.query.filter_by(
+            materia=materia,
+            lezione_num=lezione_num
+        ).all()
+        
+        if not interrogations:
+            return jsonify({'success': False, 'error': 'Lezione non trovata'}), 404
+        
+        for interr in interrogations:
+            interr.data_lezione = data_lezione
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Data assegnata alla lezione {lezione_num}',
+            'updated_count': len(interrogations)
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/set-all-dates', methods=['POST'])
+def set_all_dates():
+    """
+    Assegna date automatiche a tutte le lezioni di una materia
+    
+    Request Body:
+        materia (str): Nome materia
+        data_inizio (str): Data di inizio in formato YYYY-MM-DD
+        giorni_settimana (list): Lista giorni settimana (0=Lunedì, 6=Domenica)
+        
+    Returns:
+        JSON: Risultato aggiornamento
+    """
+    try:
+        data = request.get_json()
+        
+        if not all(k in data for k in ['materia', 'data_inizio', 'giorni_settimana']):
+            return jsonify({'success': False, 'error': 'Dati mancanti'}), 400
+        
+        materia = data['materia']
+        data_inizio = data['data_inizio']
+        giorni_settimana = data['giorni_settimana']  # es: [0, 2] = Lunedì e Mercoledì
+        
+        from datetime import datetime, timedelta
+        
+        # Valida data inizio
+        try:
+            current_date = datetime.strptime(data_inizio, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({'success': False, 'error': 'Formato data non valido'}), 400
+        
+        # Recupera tutte le lezioni ordinate
+        config = CalendarConfiguration.query.filter_by(materia=materia).order_by(
+            CalendarConfiguration.created_at.desc()
+        ).first()
+        
+        if not config:
+            return jsonify({'success': False, 'error': 'Configurazione non trovata'}), 404
+        
+        num_lezioni = config.num_lezioni
+        
+        # Assegna date progressivamente
+        lezione_count = 0
+        dates_assigned = {}
+        
+        while lezione_count < num_lezioni:
+            # Controlla se il giorno corrente è uno dei giorni di interrogazione
+            if current_date.weekday() in giorni_settimana:
+                lezione_count += 1
+                
+                # Aggiorna interrogazioni per questa lezione
+                interrogations = Interrogation.query.filter_by(
+                    materia=materia,
+                    lezione_num=lezione_count
+                ).all()
+                
+                for interr in interrogations:
+                    interr.data_lezione = current_date.strftime('%Y-%m-%d')
+                
+                dates_assigned[lezione_count] = current_date.strftime('%Y-%m-%d')
+            
+            current_date += timedelta(days=1)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'{num_lezioni} lezioni programmate con date',
+            'dates': dates_assigned
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 # ==================== API - SALVATAGGIO ED ESPORTAZIONE ====================
 
 @app.route('/api/save-to-db', methods=['POST'])

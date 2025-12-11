@@ -17,6 +17,10 @@
                     </div>
                     <div class="col-md-6 text-end">
                         <div class="btn-group" role="group">
+                            <button class="btn btn-light" id="btn-set-dates" title="Assegna date alle lezioni">
+                                <i class="bi bi-calendar-plus"></i>
+                                Imposta Date
+                            </button>
                             <button class="btn btn-light" id="btn-shuffle">
                                 <i class="bi bi-shuffle"></i>
                                 Rimescola
@@ -97,8 +101,9 @@
                     <table class="table table-bordered table-hover" id="calendar-table">
                         <thead class="table-dark">
                             <tr>
-                                <th width="10%">Lezione</th>
-                                <th width="70%">Studenti Interrogati</th>
+                                <th width="8%">Lezione</th>
+                                <th width="15%">Data</th>
+                                <th width="57%">Studenti Interrogati</th>
                                 <th width="20%">Azioni</th>
                             </tr>
                         </thead>
@@ -200,6 +205,86 @@
         </div>
     </div>
 </div>
+
+<!-- Modal: Imposta Date Automatiche -->
+<div class="modal fade" id="modalSetDates" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-calendar-plus"></i>
+                    Imposta Date Interrogazioni
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Data di Inizio</label>
+                    <input type="date" class="form-control" id="modal-data-inizio" required>
+                    <div class="form-text">Seleziona la data della prima interrogazione</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Giorni della Settimana</label>
+                    <div class="form-check">
+                        <input class="form-check-input day-checkbox" type="checkbox" value="0" id="day-0">
+                        <label class="form-check-label" for="day-0">Lunedì</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input day-checkbox" type="checkbox" value="1" id="day-1">
+                        <label class="form-check-label" for="day-1">Martedì</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input day-checkbox" type="checkbox" value="2" id="day-2">
+                        <label class="form-check-label" for="day-2">Mercoledì</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input day-checkbox" type="checkbox" value="3" id="day-3">
+                        <label class="form-check-label" for="day-3">Giovedì</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input day-checkbox" type="checkbox" value="4" id="day-4">
+                        <label class="form-check-label" for="day-4">Venerdì</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input day-checkbox" type="checkbox" value="5" id="day-5">
+                        <label class="form-check-label" for="day-5">Sabato</label>
+                    </div>
+                    <div class="form-text mt-2">Seleziona i giorni in cui vuoi fare interrogazioni</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button type="button" class="btn btn-info text-white" id="btn-apply-dates">
+                    <i class="bi bi-check-circle"></i>
+                    Applica Date
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Imposta Data Singola -->
+<div class="modal fade" id="modalSetSingleDate" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h6 class="modal-title">
+                    <i class="bi bi-calendar-event"></i>
+                    Data Lezione <span id="modal-single-lesson-num"></span>
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="date" class="form-control" id="modal-single-date" required>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Annulla</button>
+                <button type="button" class="btn btn-success btn-sm" id="btn-save-single-date">Salva</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -269,6 +354,106 @@ $(document).ready(function() {
                 showAlert('Salvato su TinyDB!', 'success');
             } else {
                 showAlert('Errore salvataggio: ' + response.error, 'danger');
+            }
+        });
+    });
+    
+    // Mostra modale imposta date
+    $('#btn-set-dates').on('click', function() {
+        // Imposta data minima a oggi
+        const today = new Date().toISOString().split('T')[0];
+        $('#modal-data-inizio').attr('min', today);
+        $('#modal-data-inizio').val(today);
+        
+        // Reset checkbox
+        $('.day-checkbox').prop('checked', false);
+        
+        $('#modalSetDates').modal('show');
+    });
+    
+    // Applica date automatiche
+    $('#btn-apply-dates').on('click', function() {
+        const dataInizio = $('#modal-data-inizio').val();
+        const giorniSelezionati = [];
+        
+        $('.day-checkbox:checked').each(function() {
+            giorniSelezionati.push(parseInt($(this).val()));
+        });
+        
+        if (!dataInizio) {
+            showAlert('Seleziona una data di inizio', 'warning');
+            return;
+        }
+        
+        if (giorniSelezionati.length === 0) {
+            showAlert('Seleziona almeno un giorno della settimana', 'warning');
+            return;
+        }
+        
+        const btn = $(this);
+        btn.prop('disabled', true);
+        
+        $.ajax({
+            url: '/api/set-all-dates',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                materia: currentMateria,
+                data_inizio: dataInizio,
+                giorni_settimana: giorniSelezionati
+            }),
+            success: function(response) {
+                if (response.success) {
+                    showAlert(`Date assegnate a ${response.message}`, 'success');
+                    $('#modalSetDates').modal('hide');
+                    loadCalendar(); // Ricarica per mostrare le date
+                } else {
+                    showAlert('Errore: ' + response.error, 'danger');
+                }
+                btn.prop('disabled', false);
+            },
+            error: function() {
+                showAlert('Errore nella comunicazione con il server', 'danger');
+                btn.prop('disabled', false);
+            }
+        });
+    });
+    
+    // Salva data singola lezione
+    $('#btn-save-single-date').on('click', function() {
+        const lessonNum = $('#modal-single-lesson-num').text();
+        const dataLezione = $('#modal-single-date').val();
+        
+        if (!dataLezione) {
+            showAlert('Seleziona una data', 'warning');
+            return;
+        }
+        
+        const btn = $(this);
+        btn.prop('disabled', true);
+        
+        $.ajax({
+            url: '/api/set-lesson-date',
+            type: 'PUT',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                materia: currentMateria,
+                lezione_num: parseInt(lessonNum),
+                data_lezione: dataLezione
+            }),
+            success: function(response) {
+                if (response.success) {
+                    showAlert('Data assegnata alla lezione', 'success');
+                    $('#modalSetSingleDate').modal('hide');
+                    loadCalendar(); // Ricarica per mostrare la data
+                } else {
+                    showAlert('Errore: ' + response.error, 'danger');
+                }
+                btn.prop('disabled', false);
+            },
+            error: function() {
+                showAlert('Errore nella comunicazione con il server', 'danger');
+                btn.prop('disabled', false);
             }
         });
     });
@@ -379,6 +564,13 @@ $(document).ready(function() {
         Object.keys(currentCalendar).sort((a, b) => a - b).forEach(lessonNum => {
             const students = currentCalendar[lessonNum];
             
+            // Recupera data dalla prima interrogazione (tutte hanno la stessa data per lezione)
+            const dataLezione = students[0]?.data_lezione || null;
+            const dataDisplay = dataLezione ? formatDate(dataLezione) : 
+                `<button class="btn btn-sm btn-outline-success" onclick="openSetDateModal(${lessonNum})">
+                    <i class="bi bi-calendar-plus"></i> Imposta
+                </button>`;
+            
             let studentsHtml = '<div class="d-flex flex-wrap gap-2">';
             students.forEach(student => {
                 const studentData = student.student || student;
@@ -395,7 +587,10 @@ $(document).ready(function() {
             const row = `
                 <tr>
                     <td class="text-center align-middle">
-                        <strong class="fs-5">Lezione ${lessonNum}</strong>
+                        <strong class="fs-5">${lessonNum}</strong>
+                    </td>
+                    <td class="text-center align-middle">
+                        ${dataDisplay}
                     </td>
                     <td>${studentsHtml}</td>
                     <td class="text-center align-middle">
@@ -409,6 +604,21 @@ $(document).ready(function() {
             
             tbody.append(row);
         });
+    }
+    
+    function formatDate(dateStr) {
+        if (!dateStr) return '';
+        const date = new Date(dateStr + 'T00:00:00'); // Forza interpretazione locale
+        const options = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
+        return date.toLocaleDateString('it-IT', options);
+    }
+    
+    function openSetDateModal(lessonNum) {
+        $('#modal-single-lesson-num').text(lessonNum);
+        const today = new Date().toISOString().split('T')[0];
+        $('#modal-single-date').attr('min', today);
+        $('#modal-single-date').val('');
+        $('#modalSetSingleDate').modal('show');
     }
     
     function updateStatistics() {
