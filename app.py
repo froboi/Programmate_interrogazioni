@@ -6,7 +6,7 @@ Fornisce API REST per gestione studenti e calendario interrogazioni
 import pymysql
 pymysql.install_as_MySQLdb()
 
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, render_template, request, jsonify, send_file, make_response
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 import os
@@ -360,6 +360,17 @@ def calendar_page():
         HTML: Template calendario
     """
     return render_template('calendar.html')
+
+
+@app.route('/interrogations')
+def interrogations_page():
+    """
+    Pagina gestione interrogazioni per estrazione
+    
+    Returns:
+        HTML: Template interrogations
+    """
+    return render_template('interrogations.html')
 
 
 # ==================== API - STUDENTI ====================
@@ -1106,6 +1117,294 @@ def export_data():
                 json.dump(export_data, jsonfile, ensure_ascii=False, indent=2)
             
             return send_file(filepath, as_attachment=True, download_name=filename)
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ==================== API - GESTIONE INTERROGAZIONI ====================
+
+@app.route('/api/interrogations/by-materia/<materia>', methods=['GET'])
+def get_interrogations_by_materia(materia):
+    """
+    Recupera tutte le interrogazioni raggruppate per lezione/estrazione
+    
+    Args:
+        materia (str): Nome materia
+        
+    Returns:
+        JSON: Interrogazioni raggruppate
+    """
+    try:
+        interrogations = Interrogation.query.filter_by(materia=materia).order_by(
+            Interrogation.lezione_num, Interrogation.ordine
+        ).all()
+        
+        # Raggruppa per lezione (estrazione)
+        groups = {}
+        for interr in interrogations:
+            lezione_num = interr.lezione_num
+            if lezione_num not in groups:
+                groups[lezione_num] = {
+                    'lezione_num': lezione_num,
+                    'data_lezione': interr.data_lezione,
+                    'studenti': []
+                }
+            
+            groups[lezione_num]['studenti'].append({
+                'id': interr.id,
+                'student_id': interr.student_id,
+                'ordine': interr.ordine,
+                'student': interr.student.to_dict()
+            })
+        
+        # Converti in lista ordinata
+        groups_list = [groups[k] for k in sorted(groups.keys())]
+        
+        return jsonify({
+            'success': True,
+            'materia': materia,
+            'groups': groups_list,
+            'total_lessons': len(groups_list),
+            'total_students': len(interrogations)
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/interrogations/all-materie', methods=['GET'])
+def get_all_materie():
+    """
+    Recupera tutte le materie disponibili
+    
+    Returns:
+        JSON: Lista materie
+    """
+    try:
+        materie = db.session.query(Interrogation.materia).distinct().all()
+        materie_list = [m[0] for m in materie]
+        
+        return jsonify({
+            'success': True,
+            'materie': materie_list
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/interrogations/update-student', methods=['PUT'])
+def update_interrogation_student():
+    """
+    Modifica lo studente di un'interrogazione specifica
+    
+    Request Body:
+        interrogation_id (int): ID interrogazione
+        new_registro_num (int): Nuovo numero registro studente
+        
+    Returns:
+        JSON: Risultato aggiornamento
+    """
+    try:
+        data = request.get_json()
+        
+        if not all(k in data for k in ['interrogation_id', 'new_registro_num']):
+            return jsonify({'success': False, 'error': 'Dati mancanti'}), 400
+        
+        interrogation_id = data['interrogation_id']
+        new_registro_num = data['new_registro_num']
+        
+        # Trova interrogazione
+        interrogation = Interrogation.query.get(interrogation_id)
+        if not interrogation:
+            return jsonify({'success': False, 'error': 'Interrogazione non trovata'}), 404
+        
+        # Trova nuovo studente
+        new_student = Student.query.filter_by(registro_num=new_registro_num).first()
+        if not new_student:
+            return jsonify({'success': False, 'error': 'Studente non trovato'}), 404
+        
+        # Aggiorna
+        interrogation.student_id = new_student.id
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Studente aggiornato con successo',
+            'interrogation': {
+                'id': interrogation.id,
+                'student': new_student.to_dict()
+            }
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/interrogations/export/<materia>/<format>', methods=['GET'])
+def export_interrogations(materia, format):
+    """
+    Esporta interrogazioni in formato JSON o CSV
+    
+    Args:
+        materia (str): Nome materia
+        format (str): 'json' o 'csv'
+        
+    Returns:
+        File: Download del file
+    """
+    try:
+        from datetime import datetime
+        import csv
+        from io import StringIO
+        
+        interrogations = Interrogation.query.filter_by(materia=materia).order_by(
+            Interrogation.lezione_num, Interrogation.ordine
+        ).all()
+        
+        if format == 'json':
+            # Export JSON
+            groups = {}
+            for interr in interrogations:
+                lezione_num = interr.lezione_num
+                if lezione_num not in groups:
+                    groups[lezione_num] = {
+                        'lezione': lezione_num,
+                        'data': interr.data_lezione.strftime('%Y-%m-%d') if interr.data_lezione else None,
+                        'studenti': []
+                    }
+                
+                groups[lezione_num]['studenti'].append({
+                    'ordine': interr.ordine,
+                    'registro_num': interr.student.registro_num,
+                    'nome': interr.student.nome,
+                    'cognome': interr.student.cognome
+                })
+            
+            data = {
+                'materia': materia,
+                'data_export': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'estrazioni': [groups[k] for k in sorted(groups.keys())]
+            }
+            
+            response = make_response(json.dumps(data, indent=2, ensure_ascii=False))
+            response.headers['Content-Type'] = 'application/json; charset=utf-8'
+            response.headers['Content-Disposition'] = f'attachment; filename=interrogazioni_{materia}_{datetime.now().strftime("%Y%m%d")}.json'
+            return response
+            
+        elif format == 'csv':
+            # Export CSV
+            output = StringIO()
+            writer = csv.writer(output)
+            writer.writerow(['Lezione', 'Data', 'Ordine', 'Registro', 'Nome', 'Cognome'])
+            
+            for interr in interrogations:
+                writer.writerow([
+                    interr.lezione_num,
+                    interr.data_lezione.strftime('%Y-%m-%d') if interr.data_lezione else '',
+                    interr.ordine,
+                    interr.student.registro_num,
+                    interr.student.nome,
+                    interr.student.cognome
+                ])
+            
+            response = make_response(output.getvalue())
+            response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+            response.headers['Content-Disposition'] = f'attachment; filename=interrogazioni_{materia}_{datetime.now().strftime("%Y%m%d")}.csv'
+            return response
+        
+        elif format == 'pdf':
+            # Export PDF
+            from io import BytesIO
+            from reportlab.lib.pagesizes import A4
+            from reportlab.lib import colors
+            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.lib.units import cm
+            
+            buffer = BytesIO()
+            doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=2*cm, leftMargin=2*cm, 
+                                   topMargin=2*cm, bottomMargin=2*cm)
+            
+            elements = []
+            styles = getSampleStyleSheet()
+            
+            # Titolo
+            title_style = ParagraphStyle(
+                'CustomTitle',
+                parent=styles['Heading1'],
+                fontSize=18,
+                textColor=colors.HexColor('#2c3e50'),
+                spaceAfter=30,
+                alignment=1  # Center
+            )
+            elements.append(Paragraph(f"Calendario Interrogazioni - {materia}", title_style))
+            elements.append(Paragraph(f"Esportato il: {datetime.now().strftime('%d/%m/%Y %H:%M')}", 
+                                     styles['Normal']))
+            elements.append(Spacer(1, 0.5*cm))
+            
+            # Raggruppa per lezione
+            groups = {}
+            for interr in interrogations:
+                lezione_num = interr.lezione_num
+                if lezione_num not in groups:
+                    groups[lezione_num] = []
+                groups[lezione_num].append(interr)
+            
+            # Crea tabelle per ogni gruppo
+            for lezione_num in sorted(groups.keys()):
+                # Header del gruppo
+                header_style = ParagraphStyle(
+                    'GroupHeader',
+                    parent=styles['Heading2'],
+                    fontSize=14,
+                    textColor=colors.HexColor('#3498db'),
+                    spaceAfter=10
+                )
+                
+                data_lezione = groups[lezione_num][0].data_lezione
+                data_str = data_lezione.strftime('%d/%m/%Y') if data_lezione else 'Data non assegnata'
+                elements.append(Paragraph(f"Estrazione {lezione_num} - {data_str}", header_style))
+                
+                # Tabella studenti
+                table_data = [['#', 'Registro', 'Nome', 'Cognome']]
+                for interr in groups[lezione_num]:
+                    table_data.append([
+                        str(interr.ordine),
+                        str(interr.student.registro_num),
+                        interr.student.nome,
+                        interr.student.cognome
+                    ])
+                
+                table = Table(table_data, colWidths=[1.5*cm, 2*cm, 6*cm, 6*cm])
+                table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3498db')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 11),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                    ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                    ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#ecf0f1')])
+                ]))
+                
+                elements.append(table)
+                elements.append(Spacer(1, 0.8*cm))
+            
+            # Genera PDF
+            doc.build(elements)
+            buffer.seek(0)
+            
+            response = make_response(buffer.getvalue())
+            response.headers['Content-Type'] = 'application/pdf'
+            response.headers['Content-Disposition'] = f'attachment; filename=interrogazioni_{materia}_{datetime.now().strftime("%Y%m%d")}.pdf'
+            return response
+        
+        else:
+            return jsonify({'success': False, 'error': 'Formato non valido'}), 400
         
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
